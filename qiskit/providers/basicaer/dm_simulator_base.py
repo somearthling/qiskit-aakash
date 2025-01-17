@@ -48,6 +48,7 @@ import itertools
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
+from copy import deepcopy
 
 from qiskit.transpiler.coupling import CouplingMap
 
@@ -1173,8 +1174,19 @@ class DmSimulatorPy_Base(BackendV1):
         result_list = []
         self._qobj_config = qobj.config
         start = time.time()
-        for experiment in qobj.experiments:
+        for idx, experiment in enumerate(qobj.experiments):
+            print(f"Running experiment {idx + 1}/{len(qobj.experiments)}...")
+            decoherence_factor = deepcopy(self._decoherence_factor)
+            decay_factor = deepcopy(self._decay_factor)
+            depolarization_factor = deepcopy(self._depolarization_factor)
+            dipole_error = deepcopy(self._dipole_error)
+            crosstalk = deepcopy(self._crosstalk)
             result_list.append(self.run_experiment(experiment))
+            self._decoherence_factor = decoherence_factor
+            self._decay_factor = decay_factor
+            self._depolarization_factor = depolarization_factor
+            self._dipole_error = dipole_error
+            self._crosstalk = crosstalk
         end = time.time()
         result = {
             "backend_name": self.name(),
