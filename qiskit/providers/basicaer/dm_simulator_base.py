@@ -472,10 +472,18 @@ class DmSimulatorPy_Base(BackendV1):
 
             couples = 1. - couples
 
-        self._dipole_error_scale[couples == 0]  = np.nan if self._dipole_error_scale is not None else None
-        self._dipole_error_angle[couples == 0]  = np.nan if self._dipole_error_angle is not None else None
-        self._crosstalk_scale[couples == 0]     = np.nan if self._crosstalk_scale is not None else None
-        self._crosstalk_angle[couples == 0]     = np.nan if self._crosstalk_angle is not None else None
+        if self._dipole_error_scale is not None:
+            self._dipole_error_scale[couples == 0]  = np.nan
+        if self._dipole_error_angle is not None:
+            self._dipole_error_angle[couples == 0]  = np.nan
+        if self._crosstalk_scale is not None:
+            self._crosstalk_scale[couples == 0]     = np.nan
+        if self._crosstalk_angle is not None:
+            self._crosstalk_angle[couples == 0]     = np.nan
+        # self._dipole_error_scale[couples == 0]  = np.nan if self._dipole_error_scale is not None else None
+        # self._dipole_error_angle[couples == 0]  = np.nan if self._dipole_error_angle is not None else None
+        # self._crosstalk_scale[couples == 0]     = np.nan if self._crosstalk_scale is not None else None
+        # self._crosstalk_angle[couples == 0]     = np.nan if self._crosstalk_angle is not None else None
 
 
 
@@ -630,9 +638,9 @@ class DmSimulatorPy_Base(BackendV1):
         # We get permutations of signs for summing those coefficient values.
 
         if basis != "N":
-            operator_mes = np.array([[1, err_param], [1, -err_param]], dtype=self._precision)
+            operator_mes = np.array([[1, err_param[0]], [1, -err_param[0]]], dtype=self._precision)
             for i in range(self._number_of_qubits - 1):
-                operator_mes = np.kron(np.array([[1, err_param], [1, -err_param]]), operator_mes)
+                operator_mes = np.kron(np.array([[1, err_param[i]], [1, -err_param[i]]]), operator_mes)
         else:
             n = add_param * err_param
             operator_mes = np.array([[1, n[0], n[1], n[2]], [1, -n[0], -n[1], -n[2]]])
@@ -718,10 +726,10 @@ class DmSimulatorPy_Base(BackendV1):
         for mqb, mcb, mcregb in list(zip(measured_qubits, cmembits, cregbits)):
             if basis == "N" and add_param is not None:
                 self._add_qasm_measure_N(
-                    mqb, mcb, mcregb, add_param, self._error_params["measurement"]
+                    mqb, mcb, mcregb, add_param, self._error_params["measurement"][mqb]
                 )
             else:
-                supplement_data[basis][0](mqb, mcb, mcregb, self._error_params["measurement"])
+                supplement_data[basis][0](mqb, mcb, mcregb, self._error_params["measurement"][mqb])
         return partial_prob, max_str, max_prob
 
     def _pauli_string_expectation(self, basis, err_param, add_param=None):
@@ -742,17 +750,19 @@ class DmSimulatorPy_Base(BackendV1):
                 self._densitymatrix, (4 ** (i), 4, 4 ** (self._number_of_qubits - i - 1))
             )
             if basis[i] == "X":
-                self._densitymatrix[:, 1, :] *= err_param
+                self._densitymatrix[:, 1, :] *= err_param[i]
                 self._densitymatrix[:, 2, :] = 0
                 self._densitymatrix[:, 3, :] = 0
             elif basis[i] == "Y":
                 self._densitymatrix[:, 1, :] = 0
-                self._densitymatrix[:, 2, :] *= err_param
+                self._densitymatrix[:, 2, :] *= err_param[i]
                 self._densitymatrix[:, 3, :] = 0
             elif basis[i] == "Z":
                 self._densitymatrix[:, 1, :] = 0
                 self._densitymatrix[:, 2, :] = 0
-                self._densitymatrix[:, 3, :] *= err_param
+                # print(err_param[i])
+                # print(self._densitymatrix[:, 3, :])
+                self._densitymatrix[:, 3, :] *= err_param[i]
 
         self._densitymatrix = np.reshape(self._densitymatrix, self._number_of_qubits * [4])
         index = tuple([bas_ind[x] for x in basis])
@@ -1222,9 +1232,11 @@ class DmSimulatorPy_Base(BackendV1):
         self._validate_initial_densitymatrix()
 
         self._initialize_errors()
+        # print(self._error_params['measurement'])
         # Initialize classical memory to all 0
         self._classical_memory = 0
         self._classical_register = 0
+        # print(self._error_params['measurement'])
         # print("MERGING U1 and U3 GATES\n")
         experiment.instructions = single_gate_merge(
             experiment.instructions, self._number_of_qubits, self.MERGE
@@ -1232,7 +1244,7 @@ class DmSimulatorPy_Base(BackendV1):
         partitioned_instructions, levels = partition(
             experiment.instructions, self._number_of_qubits, self._two_qubit_gate_partition_name
         )
-
+        # print(self._error_params['measurement'])
         if self.SHOW_PARTITION:
             self._describe_partition(partitioned_instructions)
 
@@ -1318,11 +1330,11 @@ class DmSimulatorPy_Base(BackendV1):
                     if sngl_measure:
                         if str(params[0]) == "X":
                             self._add_qasm_measure_X(
-                                qubit, cmembit, cregbit, self._error_params["measurement"]
+                                qubit, cmembit, cregbit, self._error_params["measurement"][qubit]
                             )
                         elif str(params[0]) == "Y":
                             self._add_qasm_measure_Y(
-                                qubit, cmembit, cregbit, self._error_params["measurement"]
+                                qubit, cmembit, cregbit, self._error_params["measurement"][qubit]
                             )
                         elif str(params[0]) == "N":
                             params[1] = self._unit_vector_normalisation(params[1])
@@ -1331,7 +1343,7 @@ class DmSimulatorPy_Base(BackendV1):
                                 cmembit,
                                 cregbit,
                                 params[1],
-                                self._error_params["measurement"],
+                                self._error_params["measurement"][qubit],
                             )
                         elif str(params[0]) == "Bell":
                             (
@@ -1350,7 +1362,7 @@ class DmSimulatorPy_Base(BackendV1):
                             ] = reduced_bell_densitymatrix
                         else:
                             self._add_qasm_measure_Z(
-                                qubit, cmembit, cregbit, self._error_params["measurement"]
+                                qubit, cmembit, cregbit, self._error_params["measurement"][qubit]
                             )
                         partitioned_instructions[clock].remove(operation)
 
