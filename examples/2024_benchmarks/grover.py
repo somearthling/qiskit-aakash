@@ -1,4 +1,5 @@
 import numpy as np
+from time import time
 
 from qiskit import QuantumCircuit, BasicAer, execute
 from qiskit.circuit.library import Diagonal
@@ -63,48 +64,44 @@ def grover_circuit(n, variant=0, print_solutions=False):
     return circ, solutions
 
 
-qubits = 10
-seed = 0
+if __name__ == "__main__":
+    gpu = True
+    qubits = 6
+    seed = 0
 
-grover_circuits = []
-solutions_list = []
+    grover_circuits = []
+    solutions_list = []
 
-for i in range(3, qubits+1):
-    grover_circ, solutions = grover_circuit(i, seed)
-    grover_circuits.append(grover_circ)
-    solutions_list.append(solutions)
+    for i in range(3, qubits+1):
+        grover_circ, solutions = grover_circuit(i, seed)
+        grover_circuits.append(grover_circ)
+        solutions_list.append(solutions)
 
-print("dm simulator")
-sim_backend = BasicAer.get_backend("dm_simulator")
-job = execute(grover_circuits, sim_backend)
-results = job.result().results
+    if gpu:
+        print("dm simulator gpu")
+        sim_backend = BasicAer.get_backend("dm_simulator_gpu")
+    else:
+        print("dm simulator")
+        sim_backend = BasicAer.get_backend("dm_simulator")
+    job = execute(grover_circuits, sim_backend)
+    results = job.result().results
 
-partial_probabilities = [result.data.partial_probability for result in results]
+    partial_probabilities = [result.data.partial_probability for result in results]
 
-outcomes = np.empty((len(partial_probabilities), 0)).tolist()
-# print(outcomes)
+    outcomes = np.empty((len(partial_probabilities), 0)).tolist()
+    # print(outcomes)
 
-for i, partial_probability in enumerate(partial_probabilities):
-    # print(partial_probability)
-    max_probability = max(partial_probability.values())
-    outcome = []
-    for measurement in partial_probability:
-        if np.isclose(partial_probability[measurement], max_probability, atol=max_probability/2):
-            outcome.append(measurement)
-    outcomes[i] = {measurement[::-1]: partial_probability[measurement] for measurement in outcome}
-        # print(measurement)
-        # if not np.isclose(partial_probability[measurement], 0, atol=1e-2):
-        #     # outcomes[i].append((measurement, partial_probability[measurement]))
-        #     outcomes[i]=np.append(outcomes[i], {measurement[::-1]: partial_probability[measurement]})
+    for i, partial_probability in enumerate(partial_probabilities):
+        # print(partial_probability)
+        max_probability = max(partial_probability.values())
+        outcome = []
+        for measurement in partial_probability:
+            if np.isclose(partial_probability[measurement], max_probability, atol=max_probability/2):
+                outcome.append(measurement)
+        outcomes[i] = {measurement[::-1]: partial_probability[measurement] for measurement in outcome}
 
-# print(outcomes)
+    for i, solutions in enumerate(solutions_list):
+        print("n=%i" % (i+3))
 
-for i, solutions in enumerate(solutions_list):
-    print("n=%i" % (i+3))
-    # print("Expected solutions:")
-    # print(solutions)
-    # print("Obtained solutions:")
-    # print(outcomes[i])
-
-    if set(solutions) == set(outcomes[i].keys()):
-        print("Success!")
+        if set(solutions) == set(outcomes[i].keys()):
+            print("Success!")
