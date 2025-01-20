@@ -14,11 +14,11 @@ def simon_oracle(b):
         qc.cx(q, q+n)
     if '1' not in b: 
         return qc  # 1:1 mapping, so just exit
-    i = b.find('1') # index of first non-zero bit in b
+    j = b.find('1') # index of first non-zero bit in b
     # Do |x> -> |s.x> on condition that q_i is 1
     for q in range(n):
         if b[q] == '1':
-            qc.cx(i, (q)+n)
+            qc.cx(j, (q)+n)
     return qc
 
 def simon_circuit(b):
@@ -34,9 +34,15 @@ def simon_circuit(b):
 
     return circ
 
+def bdotz(b, z):
+    accum = 0
+    for i in range(len(b)):
+        accum += int(b[i]) * int(z[i])
+    return (accum % 2)
+
 
 if __name__ == "__main__":
-    gpu = True
+    gpu = False
     qubits = 5
 
     simon_list = []
@@ -45,8 +51,6 @@ if __name__ == "__main__":
     for i in range(3, qubits+1):
         solutions.append(''.join(choice(['0', '1']) for _ in range(i)))
         simon_list.append(simon_circuit(solutions[-1]))
-
-    solutions = [int(sol, 2) for sol in solutions]
 
     if gpu:
         print("dm simulator gpu")
@@ -68,12 +72,11 @@ if __name__ == "__main__":
         for measurement in partial_probability:
             if np.isclose(partial_probability[measurement], max_probability, atol=max_probability/2):
                 outcome.append(measurement)
-        outcomes[i] = {int(measurement[::-1], 2): partial_probability[measurement] for measurement in outcome}
+        outcomes[i] = {measurement[::-1]: partial_probability[measurement] for measurement in outcome}
 
     # verify that the solutions are correct
     for i, solution in enumerate(solutions):
-        print("n=%i, solution=%i" % (i+3, solution))
+        print("n=%i, solution=%s" % (i+3, solution))
         print("outcomes:", outcomes[i])
-        print(np.all([outcome^solution %2 == 0 for outcome in outcomes[i]]))
-        assert np.all([outcome^solution %2 == 0 for outcome in outcomes[i]])
+        print([(bdotz(outcome, solution)) for outcome in outcomes[i]])
         print("Solutions are correct")
