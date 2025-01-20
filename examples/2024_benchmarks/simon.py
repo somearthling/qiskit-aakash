@@ -34,13 +34,6 @@ def simon_circuit(b):
 
     return circ
 
-def bdotz(b, z):
-    accum = 0
-    for i in range(len(b)):
-        accum += int(b[i]) * int(z[i])
-    return (accum % 2)
-
-
 if __name__ == "__main__":
     gpu = False
     qubits = 5
@@ -51,6 +44,8 @@ if __name__ == "__main__":
     for i in range(3, qubits+1):
         solutions.append(''.join(choice(['0', '1']) for _ in range(i)))
         simon_list.append(simon_circuit(solutions[-1]))
+
+    solutions = [int(solution, 2) for solution in solutions]
 
     if gpu:
         print("dm simulator gpu")
@@ -72,11 +67,23 @@ if __name__ == "__main__":
         for measurement in partial_probability:
             if np.isclose(partial_probability[measurement], max_probability, atol=max_probability/2):
                 outcome.append(measurement)
-        outcomes[i] = {measurement[::-1]: partial_probability[measurement] for measurement in outcome}
+        outcomes[i] = {int(measurement[::-1], 2): partial_probability[measurement] for measurement in outcome}
 
     # verify that the solutions are correct
     for i, solution in enumerate(solutions):
-        print("n=%i, solution=%s" % (i+3, solution))
+        print("n=%i, solution=%i" % (i+3, solution))
         print("outcomes:", outcomes[i])
-        print([(bdotz(outcome, solution)) for outcome in outcomes[i]])
-        print("Solutions are correct")
+        parities = []
+        for outcome in outcomes[i]:
+            dot_product = solution & outcome
+            # add digits of dot product
+            parity = 0
+            while dot_product:
+                parity += (dot_product & 1)
+                dot_product >>= 1
+            parities.append(parity % 2)
+        print("Parities:", parities)
+        if np.all(parities == 0):
+            print("Solution is correct")
+        else:
+            print("Solution is incorrect")
